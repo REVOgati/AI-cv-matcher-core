@@ -4,34 +4,109 @@
 # It will contain functions to interact with the LLM for insights and anomaly detection.
 
 from typing import Any, Dict
-import openai
-from core.config import settings
-
-import openai
+from openai import OpenAI
 from app.core.config import settings
 
-# Initialize OpenAI client
-openai.api_key = settings.OPENAI_API_KEY
+# Initialize the OpenAI client using your API key from settings
+client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
 class LLMService:
-    """Handles interaction with OpenAI models"""
+    """
+    Handles interaction with OpenAI models.
+    This class can be reused for any LLM-related tasks (e.g., chat, completion, analysis).
+    """
 
     @staticmethod
-    def ask_model(prompt: str, model="gpt-4"):
+    def ask_model(prompt: str, model: str = "gpt-4") -> str:
         """
-        Sends a prompt to OpenAI and returns the response.
+        Sends a prompt to the specified OpenAI model and returns the response.
+
+        Args:
+            prompt (str): The user's input or question.
+            model (str): The model to use (default: "gpt-4").
+
+        Returns:
+            str: The model's response or an error message.
         """
         try:
-            response = openai.ChatCompletion.create(
+            # Create a chat completion using the OpenAI client
+            response = client.chat.completions.create(
                 model=model,
-                messages=[{"role": "system", "content": "You are Insight Guardian API."},
-                          {"role": "user", "content": prompt}],
+                messages=[
+                    {"role": "system", "content": "You are Insight Guardian API."},
+                    {"role": "user", "content": prompt}
+                ],
                 temperature=0.3,
                 max_tokens=200
             )
-            return response["choices"][0]["message"]["content"]
+            # Extract and return the assistant's reply
+            return response.choices[0].message.content
         except Exception as e:
+            # Return a readable error message
             return f"Error with LLM request: {str(e)}"
 
+    @staticmethod
+    def extract_cv_info(cv_text: str, model: str = "gpt-4") -> dict:
+        """
+        Extracts candidate info, work experience, and education from CV text using LLM.
+        Returns a structured dict or error message.
+        """
+        prompt = (
+            "Extract the following information from the provided CV text. If any field is missing, return null. "
+            "Recognize synonyms and context (e.g., 'Professional History' for 'Work Experience'). "
+            "Return arrays for work_experiences and educations. Portfolio links should be valid URLs. "
+            "Use this JSON schema for your response. Only return valid JSON, do not include any explanation or extra text.\n"
+            "{\n"
+            "  'candidate': {\n"
+            "    'full_name': 'string',\n"
+            "    'first_name': 'string or null',\n"
+            "    'last_name': 'string or null',\n"
+            "    'email': 'string',\n"
+            "    'phone': 'string or null',\n"
+            "    'date_of_birth': 'YYYY-MM-DD or null',\n"
+            "    'links': [\n"
+            "      {'link_1': 'url or null'},\n"
+            "      {'link_2': 'url or null'},\n"
+            "      {'link_3': 'url or null'}\n"
+            "    ],\n"
+            "    'preferences': 'json structure or null'\n"
+            "  },\n"
+            "  'work_experiences': [\n"
+            "    {\n"
+            "      'company_name': 'string',\n"
+            "      'job_title': 'string',\n"
+            "      'from_date': 'YYYY-MM-DD',\n"
+            "      'to_date': 'YYYY-MM-DD or null',\n"
+            "      'is_current': 'boolean',\n"
+            "      'responsibilities': 'string or null'\n"
+            "    }\n"
+            "  ],\n"
+            "  'educations': [\n"
+            "    {\n"
+            "      'institution_name': 'string',\n"
+            "      'course': 'string',\n"
+            "      'from_date': 'YYYY-MM-DD',\n"
+            "      'to_date': 'YYYY-MM-DD or null',\n"
+            "      'is_current': 'boolean'\n"
+            "    }\n"
+            "  ]\n"
+            "}\n"
+            f"\nCV Text:\n{cv_text}"
+        )
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant for CV parsing."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.2,
+                max_tokens=1500
+            )
+            import json
+            # Try to parse the response as JSON
+            return json.loads(response.choices[0].message.content)
+        except Exception as e:
+            return {"error": str(e)}
 
-   
+
