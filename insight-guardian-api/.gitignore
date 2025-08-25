@@ -1,0 +1,11 @@
+# Ignore environment files
+*.env
+.env
+insight-guardian-api/.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+insightvenv/
