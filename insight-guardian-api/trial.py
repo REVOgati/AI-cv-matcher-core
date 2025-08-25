@@ -2,6 +2,8 @@
 from app.services.llm_service import LLMService
 from app.services.text_extraction_service import TextExtractionService
 
+
+
 def test_cv_extraction(pdf_path: str):
 	# Read PDF file as bytes
 	with open(pdf_path, "rb") as f:
@@ -10,8 +12,14 @@ def test_cv_extraction(pdf_path: str):
 	extracted_text = TextExtractionService.extract_text(file_bytes, "pdf")
 	print("--- Extracted Text ---")
 	print(extracted_text)
-	# Pass extracted text to LLM for CV info extraction
-	cv_info = LLMService.extract_cv_info(extracted_text)
+
+	# Truncate extracted text before sending to LLM for CV info extraction
+	truncated_text = extracted_text[:1000]
+	print("--- Truncated Text ---")
+	print(truncated_text)
+
+	# Pass truncated text to LLM for CV info extraction
+	cv_info = LLMService.extract_cv_info(truncated_text)
 	print("--- LLM Extracted CV Info ---")
 	print(cv_info)
 

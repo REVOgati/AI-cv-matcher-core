@@ -7,8 +7,12 @@ from typing import Any, Dict
 from openai import OpenAI
 from app.core.config import settings
 
-# Initialize the OpenAI client using your API key from settings
-client = OpenAI(api_key=settings.OPENAI_API_KEY)
+# Initialize the OpenAI client for OpenRouter
+client = OpenAI(
+    api_key=settings.OPENAI_API_KEY,
+    base_url="https://openrouter.ai/api/v1"
+)
+
 
 class LLMService:
     """
@@ -51,7 +55,9 @@ class LLMService:
         Extracts candidate info, work experience, and education from CV text using LLM.
         Returns a structured dict or error message.
         """
-        prompt = (
+        # Truncate CV text to fit within token limits (e.g., first 1000 characters)
+        truncated_text = cv_text[:1000]
+        prompt_instructions = (
             "Extract the following information from the provided CV text. If any field is missing, return null. "
             "Recognize synonyms and context (e.g., 'Professional History' for 'Work Experience'). "
             "Return arrays for work_experiences and educations. Portfolio links should be valid URLs. "
@@ -91,8 +97,8 @@ class LLMService:
             "    }\n"
             "  ]\n"
             "}\n"
-            f"\nCV Text:\n{cv_text}"
         )
+        prompt = prompt_instructions + f"\nCV Text:\n{truncated_text}"
         try:
             response = client.chat.completions.create(
                 model=model,
@@ -101,11 +107,18 @@ class LLMService:
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.2,
-                max_tokens=1500
+                max_tokens=330
             )
+            raw_output = response.choices[0].message.content
+            print("--- Raw LLM Output ---")
+            print(raw_output)
             import json
-            # Try to parse the response as JSON
-            return json.loads(response.choices[0].message.content)
+            if not raw_output or raw_output.strip() == "":
+                return {"error": "LLM returned empty response."}
+            try:
+                return json.loads(raw_output)
+            except Exception as e:
+                return {"error": f"Failed to parse LLM output as JSON: {str(e)}", "output": raw_output}
         except Exception as e:
             return {"error": str(e)}
 
